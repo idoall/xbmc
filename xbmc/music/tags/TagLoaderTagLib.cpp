@@ -271,7 +271,7 @@ bool CTagLoaderTagLib::ParseTag(ID3v1::Tag *id3v1, EmbeddedArt *art, CMusicInfoT
   tag.SetArtist(id3v1->artist().to8Bit(true));
   tag.SetAlbum(id3v1->album().to8Bit(true));
   tag.SetComment(id3v1->comment().to8Bit(true));
-  tag.SetGenre(id3v1->genre().to8Bit(true));
+  tag.SetGenre(id3v1->genre().to8Bit(true), true);
   tag.SetYear(id3v1->year());
   tag.SetTrackNumber(id3v1->track());
   return true;
@@ -893,12 +893,12 @@ bool CTagLoaderTagLib::ParseTag(MP4::Tag *mp4, EmbeddedArt *art, CMusicInfoTag& 
 }
 
 template<>
-bool CTagLoaderTagLib::ParseTag(Tag *generic, EmbeddedArt *art, CMusicInfoTag& tag)
+bool CTagLoaderTagLib::ParseTag(Tag *genericTag, EmbeddedArt *art, CMusicInfoTag& tag)
 {
-  if (!generic)
+  if (!genericTag)
     return false;
 
-  PropertyMap properties = generic->properties();
+  PropertyMap properties = genericTag->properties();
   for (PropertyMap::ConstIterator it = properties.begin(); it != properties.end(); ++it)
   {
     if (it->first == "ARTIST")
@@ -1025,9 +1025,9 @@ void CTagLoaderTagLib::SetGenre(CMusicInfoTag &tag, const std::vector<std::strin
     genres.push_back(genre);
   }
   if (genres.size() == 1)
-    tag.SetGenre(genres[0]);
+    tag.SetGenre(genres[0], true);
   else
-    tag.SetGenre(genres);
+    tag.SetGenre(genres, true);
 }
 
 void CTagLoaderTagLib::SetReleaseType(CMusicInfoTag &tag, const std::vector<std::string> &values)
@@ -1217,7 +1217,7 @@ bool CTagLoaderTagLib::Load(const std::string& strFileName, CMusicInfoTag& tag, 
   ID3v1::Tag *id3v1 = nullptr;
   ID3v2::Tag *id3v2 = nullptr;
   Ogg::XiphComment *xiph = nullptr;
-  Tag *generic = nullptr;
+  Tag *genericTag = nullptr;
 
   if (apeFile)
     ape = apeFile->APETag(false);
@@ -1257,7 +1257,7 @@ bool CTagLoaderTagLib::Load(const std::string& strFileName, CMusicInfoTag& tag, 
   else if (mpcFile)
     ape = mpcFile->APETag(false);
   else    // This is a catch all to get generic information for other files types (s3m, xm, it, mod, etc)
-    generic = file->tag();
+    genericTag = file->tag();
 
   if (file->audioProperties())
     tag.SetDuration(file->audioProperties()->length());
@@ -1268,8 +1268,8 @@ bool CTagLoaderTagLib::Load(const std::string& strFileName, CMusicInfoTag& tag, 
     ParseTag(id3v1, art, tag);
   if (id3v2)
     ParseTag(id3v2, art, tag);
-  if (generic)
-    ParseTag(generic, art, tag);
+  if (genericTag)
+    ParseTag(genericTag, art, tag);
   if (mp4)
     ParseTag(mp4, art, tag);
   if (xiph) // xiph tags override id3v2 tags in badly tagged FLACs

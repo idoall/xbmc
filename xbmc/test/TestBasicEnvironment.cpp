@@ -38,6 +38,7 @@
 #include "interfaces/python/XBPython.h"
 #include "pvr/PVRManager.h"
 #include "AppParamParser.h"
+#include "windowing/WinSystem.h"
 
 #if defined(TARGET_WINDOWS)
 #include "platform/win32/WIN32Util.h"
@@ -60,9 +61,6 @@ void TestBasicEnvironment::SetUp()
    * in xbmcutil::GlobalsSingleton<CAdvancedSettings>::getInstance().
    */
   g_advancedSettings.Initialize();
-
-  // Need to configure the network as some tests access the network member
-  g_application.SetupNetwork();
 
   if (!CXBMCTestUtils::Instance().SetReferenceFileBasePath())
     SetUpError();
@@ -124,6 +122,9 @@ void TestBasicEnvironment::SetUp()
   g_powerManager.Initialize();
   g_application.m_ServiceManager->CreateAudioEngine();
   CServiceBroker::GetSettings().Initialize();
+
+  std::unique_ptr<CWinSystemBase> winSystem = CWinSystemBase::CreateWinSystem();
+  g_application.m_ServiceManager->SetWinSystem(std::move(winSystem));
 
   if (!g_application.m_ServiceManager->InitStageTwo(CAppParamParser()))
     exit(1);

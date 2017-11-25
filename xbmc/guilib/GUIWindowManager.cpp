@@ -47,6 +47,7 @@
 #include "music/windows/GUIWindowMusicNav.h"
 #include "music/windows/GUIWindowMusicPlaylistEditor.h"
 #include "video/windows/GUIWindowVideoPlaylist.h"
+#include "music/dialogs/GUIDialogInfoProviderSettings.h"
 #include "music/dialogs/GUIDialogMusicInfo.h"
 #include "video/dialogs/GUIDialogVideoInfo.h"
 #include "video/windows/GUIWindowVideoNav.h"
@@ -90,6 +91,7 @@
 #include "profiles/dialogs/GUIDialogProfileSettings.h"
 #include "profiles/dialogs/GUIDialogLockSettings.h"
 #include "settings/dialogs/GUIDialogContentSettings.h"
+#include "settings/dialogs/GUIDialogLibExportSettings.h"
 #include "dialogs/GUIDialogBusy.h"
 #include "dialogs/GUIDialogKeyboardGeneric.h"
 #include "dialogs/GUIDialogKeyboardTouch.h"
@@ -128,6 +130,7 @@
 #include "pvr/windows/GUIWindowPVRSearch.h"
 #include "pvr/dialogs/GUIDialogPVRChannelManager.h"
 #include "pvr/dialogs/GUIDialogPVRChannelsOSD.h"
+#include "pvr/dialogs/GUIDialogPVRClientPriorities.h"
 #include "pvr/dialogs/GUIDialogPVRGroupManager.h"
 #include "pvr/dialogs/GUIDialogPVRGuideInfo.h"
 #include "pvr/dialogs/GUIDialogPVRChannelGuide.h"
@@ -143,6 +146,7 @@
 #include "dialogs/GUIDialogMediaFilter.h"
 #include "video/dialogs/GUIDialogSubtitles.h"
 
+#include "peripherals/dialogs/GUIDialogPeripherals.h"
 #include "peripherals/dialogs/GUIDialogPeripheralSettings.h"
 #include "addons/interfaces/AddonInterfaces.h"
 
@@ -248,9 +252,14 @@ void CGUIWindowManager::CreateWindows()
   Add(new CGUIDialogLockSettings);
 
   Add(new CGUIDialogContentSettings);
+  
+  Add(new CGUIDialogLibExportSettings);
+
+  Add(new CGUIDialogInfoProviderSettings);
 
   Add(new CGUIDialogPlayEject);
 
+  Add(new CGUIDialogPeripherals);
   Add(new CGUIDialogPeripheralSettings);
 
   Add(new CGUIDialogMediaFilter);
@@ -284,6 +293,7 @@ void CGUIWindowManager::CreateWindows()
   Add(new CGUIDialogPVRChannelsOSD);
   Add(new CGUIDialogPVRChannelGuide);
   Add(new CGUIDialogPVRRecordingSettings);
+  Add(new CGUIDialogPVRClientPriorities);
 
   Add(new CGUIDialogSelect);
   Add(new CGUIDialogMusicInfo);
@@ -349,6 +359,8 @@ bool CGUIWindowManager::DestroyWindows()
     DestroyWindow(WINDOW_DIALOG_AUDIO_OSD_SETTINGS);
     DestroyWindow(WINDOW_DIALOG_VIDEO_BOOKMARKS);
     DestroyWindow(WINDOW_DIALOG_CONTENT_SETTINGS);
+    DestroyWindow(WINDOW_DIALOG_INFOPROVIDER_SETTINGS);
+    DestroyWindow(WINDOW_DIALOG_LIBEXPORT_SETTINGS);
     DestroyWindow(WINDOW_DIALOG_FAVOURITES);
     DestroyWindow(WINDOW_DIALOG_SONG_INFO);
     DestroyWindow(WINDOW_DIALOG_SMART_PLAYLIST_EDITOR);
@@ -388,6 +400,7 @@ bool CGUIWindowManager::DestroyWindows()
     DestroyWindow(WINDOW_DIALOG_PVR_CHANNEL_GUIDE);
     DestroyWindow(WINDOW_DIALOG_OSD_TELETEXT);
     DestroyWindow(WINDOW_DIALOG_PVR_RECORDING_SETTING);
+    DestroyWindow(WINDOW_DIALOG_PVR_CLIENT_PRIORITIES);
 
     DestroyWindow(WINDOW_DIALOG_TEXT_VIEWER);
     DestroyWindow(WINDOW_DIALOG_PLAY_EJECT);
@@ -430,6 +443,9 @@ bool CGUIWindowManager::DestroyWindows()
     Remove(WINDOW_DIALOG_VOLUME_BAR);
 
     DestroyWindow(WINDOW_EVENT_LOG);
+
+    DestroyWindow(WINDOW_DIALOG_PERIPHERALS);
+    DestroyWindow(WINDOW_DIALOG_PERIPHERAL_SETTINGS);
   }
   catch (...)
   {

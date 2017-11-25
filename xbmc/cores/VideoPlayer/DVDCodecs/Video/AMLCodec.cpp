@@ -24,6 +24,7 @@
 #include "DynamicDll.h"
 
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
+#include "cores/VideoPlayer/Process/ProcessInfo.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderManager.h"
 #include "settings/AdvancedSettings.h"
@@ -1320,7 +1321,7 @@ int set_header_info(am_private_t *para)
 }
 
 /*************************************************************************/
-CAMLCodec::CAMLCodec()
+CAMLCodec::CAMLCodec(CProcessInfo &processInfo)
   : m_opened(false)
   , m_ptsIs64us(false)
   , m_speed(DVD_PLAYSPEED_NORMAL)
@@ -1330,6 +1331,7 @@ CAMLCodec::CAMLCodec()
   , m_bufferIndex(-1)
   , m_state(0)
   , m_frameSizeSum(0)
+  , m_processInfo(processInfo)
 {
   am_private = new am_private_t;
   memset(am_private, 0, sizeof(am_private_t));
@@ -1881,7 +1883,7 @@ int CAMLCodec::ReleaseFrame(const uint32_t index, bool drop)
   if (drop)
     vbuf.flags |= V4L2_BUF_FLAG_DONE;
 
-  CLog::Log(LOGDEBUG, LOGVIDEO, "CAMLCodec::ReleaseFrame idx:%u", index);
+  CLog::Log(LOGDEBUG, LOGVIDEO, "CAMLCodec::ReleaseFrame idx:%u, drop:%d", index, static_cast<int>(drop));
 
   if ((ret = m_amlVideoFile->IOControl(VIDIOC_QBUF, &vbuf)) < 0)
     CLog::Log(LOGERROR, "CAMLCodec::ReleaseFrame - VIDIOC_QBUF failed: %s", strerror(errno));
@@ -2090,14 +2092,14 @@ std::string CAMLCodec::GetStereoMode()
 {
   std::string  stereo_mode;
 
-  switch(CMediaSettings::GetInstance().GetCurrentVideoSettings().m_StereoMode)
+  switch(m_processInfo.GetVideoSettings().m_StereoMode)
   {
     case RENDER_STEREO_MODE_SPLIT_VERTICAL:   stereo_mode = "left_right"; break;
     case RENDER_STEREO_MODE_SPLIT_HORIZONTAL: stereo_mode = "top_bottom"; break;
     default:                                  stereo_mode = m_hints.stereo_mode; break;
   }
 
-  if(CMediaSettings::GetInstance().GetCurrentVideoSettings().m_StereoInvert)
+  if(m_processInfo.GetVideoSettings().m_StereoInvert)
     stereo_mode = RenderManager::GetStereoModeInvert(stereo_mode);
   return stereo_mode;
 }
@@ -2110,20 +2112,20 @@ void CAMLCodec::SetVideoRect(const CRect &SrcRect, const CRect &DestRect)
   bool update = false;
 
   // video zoom adjustment.
-  float zoom = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_CustomZoomAmount;
+  float zoom = m_processInfo.GetVideoSettings().m_CustomZoomAmount;
   if ((int)(zoom * 1000) != (int)(m_zoom * 1000))
   {
     m_zoom = zoom;
   }
   // video contrast adjustment.
-  int contrast = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_Contrast;
+  int contrast = m_processInfo.GetVideoSettings().m_Contrast;
   if (contrast != m_contrast)
   {
     SetVideoContrast(contrast);
     m_contrast = contrast;
   }
   // video brightness adjustment.
-  int brightness = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_Brightness;
+  int brightness = m_processInfo.GetVideoSettings().m_Brightness;
   if (brightness != m_brightness)
   {
     SetVideoBrightness(brightness);
@@ -2131,7 +2133,7 @@ void CAMLCodec::SetVideoRect(const CRect &SrcRect, const CRect &DestRect)
   }
 
   // video view mode
-  int view_mode = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_ViewMode;
+  int view_mode = m_processInfo.GetVideoSettings().m_ViewMode;
   if (m_view_mode != view_mode)
   {
     m_view_mode = view_mode;
@@ -2313,9 +2315,10 @@ void CAMLCodec::SetVideoRect(const CRect &SrcRect, const CRect &DestRect)
   char video_axis[256] = {};
   sprintf(video_axis, "%d %d %d %d", (int)dst_rect.x1, (int)dst_rect.y1, (int)dst_rect.x2, (int)dst_rect.y2);
 
+  int screen_mode = CDisplaySettings::GetInstance().IsNonLinearStretched() ? 4 : 1;
+
   SysfsUtils::SetString("/sys/class/video/axis", video_axis);
-  // make sure we are in 'full stretch' so we can stretch
-  SysfsUtils::SetInt("/sys/class/video/screen_mode", 1);
+  SysfsUtils::SetInt("/sys/class/video/screen_mode", screen_mode);
 
   // we only get called once gui has changed to something
   // that would show video playback, so show it.

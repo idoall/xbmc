@@ -20,6 +20,8 @@
 
 #include "ServiceBroker.h"
 #include "Application.h"
+#include "rendering/RenderSystem.h"
+#include "windowing/WinSystem.h"
 
 using namespace KODI;
 
@@ -130,7 +132,23 @@ CFileExtensionProvider& CServiceBroker::GetFileExtensionProvider()
   return g_application.m_ServiceManager->GetFileExtensionProvider();
 }
 
+CNetwork& CServiceBroker::GetNetwork()
+{
+  return g_application.m_ServiceManager->GetNetwork();
+}
+
 bool CServiceBroker::IsBinaryAddonCacheUp()
 {
   return g_application.m_ServiceManager->init_level > 1;
+}
+
+CWinSystemBase& CServiceBroker::GetWinSystem()
+{
+  return g_application.m_ServiceManager->GetWinSystem();
+}
+
+CRenderSystemBase& CServiceBroker::GetRenderSystem()
+{
+  CRenderSystemBase &renderSystem = dynamic_cast<CRenderSystemBase&>(g_application.m_ServiceManager->GetWinSystem());
+  return renderSystem;
 }

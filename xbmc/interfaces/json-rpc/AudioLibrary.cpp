@@ -553,6 +553,16 @@ JSONRPC_STATUS CAudioLibrary::SetArtistDetails(const std::string &method, ITrans
     artist.strDisbanded = parameterObject["disbanded"].asString();
   if (ParameterNotNull(parameterObject, "yearsactive"))
     CopyStringArray(parameterObject["yearsactive"], artist.yearsActive);
+  if (ParameterNotNull(parameterObject, "musicbrainzartistid"))
+    artist.strMusicBrainzArtistID = parameterObject["musicbrainzartistid"].asString();
+  if (ParameterNotNull(parameterObject, "sortname"))
+    artist.strSortName = parameterObject["sortname"].asString();
+  if (ParameterNotNull(parameterObject, "type"))
+    artist.strType = parameterObject["type"].asString();
+  if (ParameterNotNull(parameterObject, "gender"))
+    artist.strGender = parameterObject["gender"].asString();
+  if (ParameterNotNull(parameterObject, "disambiguation"))
+    artist.strDisambiguation = parameterObject["disambiguation"].asString();
 
   if (!musicdatabase.UpdateArtist(artist))
     return InternalError;
@@ -601,8 +611,16 @@ JSONRPC_STATUS CAudioLibrary::SetAlbumDetails(const std::string &method, ITransp
     album.fRating = parameterObject["rating"].asFloat();
   if (ParameterNotNull(parameterObject, "userrating"))
     album.iUserrating = parameterObject["userrating"].asInteger();
+  if (ParameterNotNull(parameterObject, "votes"))
+    album.iVotes = parameterObject["votes"].asInteger();
   if (ParameterNotNull(parameterObject, "year"))
     album.iYear = (int)parameterObject["year"].asInteger();
+  if (ParameterNotNull(parameterObject, "musicbrainzalbumid"))
+    album.strMusicBrainzAlbumID = parameterObject["musicbrainzalbumid"].asString();
+  if (ParameterNotNull(parameterObject, "musicbrainzreleasegroupid"))
+    album.strReleaseGroupMBID = parameterObject["musicbrainzreleasegroupid"].asString();
+  if (ParameterNotNull(parameterObject, "sortartist"))
+    album.strArtistSort = parameterObject["sortartist"].asString();
 
   if (!musicdatabase.UpdateAlbum(album))
     return InternalError;
@@ -686,12 +704,16 @@ JSONRPC_STATUS CAudioLibrary::Export(const std::string &method, ITransportLayer 
 {
   std::string cmd;
   if (parameterObject["options"].isMember("path"))
-    cmd = StringUtils::Format("exportlibrary(music, false, %s)", StringUtils::Paramify(parameterObject["options"]["path"].asString()).c_str());
+    cmd = StringUtils::Format("exportlibrary2(music, singlefile, %s, albums, albumartists)", StringUtils::Paramify(parameterObject["options"]["path"].asString()).c_str());
   else
-    cmd = StringUtils::Format("exportlibrary(music, true, %s, %s)",
-                              parameterObject["options"]["images"].asBoolean() ? "true" : "false",
-                              parameterObject["options"]["overwrite"].asBoolean() ? "true" : "false");
-
+  {
+    cmd = "exportlibrary2(music, library, dummy, albums, albumartists";
+    if (parameterObject["options"].isMember("images"))
+      cmd += ", artwork";
+    if (parameterObject["options"].isMember("overwrite"))
+      cmd += ", overwrite";
+    cmd += ")";
+  }
   CApplicationMessenger::GetInstance().SendMsg(TMSG_EXECUTE_BUILT_IN, -1, -1, nullptr, cmd);
   return ACK;
 }

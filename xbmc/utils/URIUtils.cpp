@@ -20,7 +20,6 @@
 
 #include "network/Network.h"
 #include "URIUtils.h"
-#include "Application.h"
 #include "FileItem.h"
 #include "filesystem/MultiPathDirectory.h"
 #include "filesystem/SpecialProtocol.h"
@@ -31,11 +30,13 @@
 #include "utils/FileExtensionProvider.h"
 #include "ServiceBroker.h"
 #include "StringUtils.h"
+#include "utils/log.h"
 
 #if defined(TARGET_WINDOWS)
 #include "platform/win32/CharsetConverter.h"
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -218,16 +219,19 @@ void URIUtils::Split(const std::string& strFileNameAndPath,
   // everything to the right of the directory separator
   strFileName = strFileNameAndPath.substr(i+1);
 
-  // ignore options
-  i = strFileName.size() - 1;
-  while (i > 0)
+  // if actual uri, ignore options
+  if (IsURL(strFileNameAndPath))
   {
-    char ch = strFileName[i];
-    if (ch == '?') break;
-    else i--;
+    i = strFileName.size() - 1;
+    while (i > 0)
+    {
+      char ch = strFileName[i];
+      if (ch == '?') break;
+      else i--;
+    }
+    if (i > 0)
+      strFileName = strFileName.substr(0, i);
   }
-  if (i > 0)
-    strFileName = strFileName.substr(0, i);
 }
 
 std::vector<std::string> URIUtils::SplitPath(const std::string& strPath)
@@ -272,6 +276,7 @@ bool URIUtils::HasParentInHostname(const CURL& url)
 {
   return url.IsProtocol("zip")
       || url.IsProtocol("rar")
+      || url.IsProtocol("archive")
       || url.IsProtocol("apk")
       || url.IsProtocol("bluray")
       || url.IsProtocol("udf")
@@ -597,12 +602,6 @@ bool URIUtils::IsRemote(const std::string& strFile)
 
 bool URIUtils::IsOnDVD(const std::string& strFile)
 {
-#ifdef TARGET_WINDOWS
-  using KODI::PLATFORM::WINDOWS::ToW;
-  if (strFile.size() >= 2 && strFile.substr(1,1) == ":")
-    return (GetDriveType(ToW(strFile.substr(0, 3)).c_str()) == DRIVE_CDROM);
-#endif
-
   if (IsProtocol(strFile, "dvd"))
     return true;
 
@@ -615,6 +614,13 @@ bool URIUtils::IsOnDVD(const std::string& strFile)
   if (IsProtocol(strFile, "cdda"))
     return true;
 
+#if defined(TARGET_WINDOWS_STORE)
+  CLog::Log(LOGDEBUG, "%s is not implemented", __FUNCTION__);
+#elif defined(TARGET_WINDOWS_DESKTOP)
+  using KODI::PLATFORM::WINDOWS::ToW;
+  if (strFile.size() >= 2 && strFile.substr(1, 1) == ":")
+    return (GetDriveType(ToW(strFile.substr(0, 3)).c_str()) == DRIVE_CDROM);
+#endif
   return false;
 }
 
@@ -684,10 +690,10 @@ bool URIUtils::IsHostOnLAN(const std::string& host, bool offLineCheck)
         return true;
     }
     // check if we are on the local subnet
-    if (!g_application.getNetwork().GetFirstConnectedInterface())
+    if (!CServiceBroker::GetNetwork().GetFirstConnectedInterface())
       return false;
 
-    if (g_application.getNetwork().HasInterfaceForIP(address))
+    if (CServiceBroker::GetNetwork().HasInterfaceForIP(address))
       return true;
   }
 
@@ -712,7 +718,7 @@ bool URIUtils::IsHD(const std::string& strFileName)
   if (HasParentInHostname(url))
     return IsHD(url.GetHostName());
 
-  return url.GetProtocol().empty() || url.IsProtocol("file");
+  return url.GetProtocol().empty() || url.IsProtocol("file") || url.IsProtocol("win-lib");
 }
 
 bool URIUtils::IsDVD(const std::string& strFile)
@@ -729,8 +735,10 @@ bool URIUtils::IsDVD(const std::string& strFile)
   if(strFile.size() < 2 || (strFile.substr(1) != ":\\" && strFile.substr(1) != ":"))
     return false;
 
+#ifndef TARGET_WINDOWS_STORE
   if(GetDriveType(KODI::PLATFORM::WINDOWS::ToW(strFile).c_str()) == DRIVE_CDROM)
     return true;
+#endif
 #else
   if (strFileLow == "iso9660://" || strFileLow == "udf://" || strFileLow == "dvd://1" )
     return true;

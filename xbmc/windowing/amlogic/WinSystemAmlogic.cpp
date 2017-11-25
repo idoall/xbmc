@@ -24,7 +24,7 @@
 #include <float.h>
 
 #include "ServiceBroker.h"
-#include "cores/RetroPlayer/process/RPProcessInfo.h"
+#include "cores/RetroPlayer/process/amlogic/RPProcessInfoAmlogic.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererGuiTexture.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.h"
 #include "cores/VideoPlayer/VideoRenderers/LinuxRendererGLES.h"
@@ -38,6 +38,7 @@
 #include "utils/log.h"
 #include "utils/SysfsUtils.h"
 #include "threads/SingleLock.h"
+#include "../WinEventsLinux.h"
 
 #include <linux/fb.h>
 
@@ -47,8 +48,6 @@ using namespace KODI;
 
 CWinSystemAmlogic::CWinSystemAmlogic()
 {
-  m_eWindowSystem = WINDOW_SYSTEM_AML;
-
   const char *env_framebuffer = getenv("FRAMEBUFFER");
 
   // default to framebuffer 0
@@ -71,6 +70,8 @@ CWinSystemAmlogic::CWinSystemAmlogic()
 
   aml_permissions();
   aml_disable_freeScale();
+
+  m_winEvents.reset(new CWinEventsLinux());
 }
 
 CWinSystemAmlogic::~CWinSystemAmlogic()
@@ -87,7 +88,8 @@ bool CWinSystemAmlogic::InitWindowSystem()
 
   CDVDVideoCodecAmlogic::Register();
   CLinuxRendererGLES::Register();
-  RETRO::CRPProcessInfo::RegisterRendererFactory(new RETRO::CRendererFactoryGuiTexture);
+  RETRO::CRPProcessInfoAmlogic::Register();
+  RETRO::CRPProcessInfoAmlogic::RegisterRendererFactory(new RETRO::CRendererFactoryGuiTexture);
   CRendererAML::Register();
 
   return CWinSystemBase::InitWindowSystem();

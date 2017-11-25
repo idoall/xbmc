@@ -29,12 +29,13 @@
 #include "guilib/GraphicContext.h"
 #include "settings/DisplaySettings.h"
 #include "utils/log.h"
+#include "../WinEventsLinux.h"
 
 CWinSystemGbm::CWinSystemGbm() :
   m_nativeDisplay(nullptr),
   m_nativeWindow(nullptr)
 {
-  m_eWindowSystem = WINDOW_SYSTEM_GBM;
+  m_winEvents.reset(new CWinEventsLinux());
 }
 
 bool CWinSystemGbm::InitWindowSystem()
@@ -64,7 +65,13 @@ bool CWinSystemGbm::CreateNewWindow(const std::string& name,
                                     bool fullScreen,
                                     RESOLUTION_INFO& res)
 {
-  if (!CGBMUtils::InitGbm(&m_gbm, m_drm.mode->hdisplay, m_drm.mode->vdisplay))
+  if(!CDRMUtils::SetMode(res))
+  {
+    CLog::Log(LOGERROR, "CWinSystemGbm::%s - failed to set DRM mode", __FUNCTION__);
+    return false;
+  }
+
+  if(!CGBMUtils::InitGbm(&m_gbm, m_drm.mode->hdisplay, m_drm.mode->vdisplay))
   {
     CLog::Log(LOGERROR, "CWinSystemGbm::%s - failed to initialize GBM", __FUNCTION__);
     return false;
@@ -127,6 +134,12 @@ bool CWinSystemGbm::ResizeWindow(int newWidth, int newHeight, int newLeft, int n
 
 bool CWinSystemGbm::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays)
 {
+  if(!CDRMUtils::SetMode(res))
+  {
+    CLog::Log(LOGERROR, "CWinSystemGbm::%s - failed to set DRM mode", __FUNCTION__);
+    return false;
+  }
+
   auto ret = m_DRM.SetVideoMode(res);
   if (!ret)
   {
@@ -139,6 +152,11 @@ bool CWinSystemGbm::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool bl
 void CWinSystemGbm::FlipPage(CGLContextEGL *pGLContext)
 {
   m_DRM.FlipPage(pGLContext);
+}
+
+void CWinSystemGbm::WaitVBlank()
+{
+  CDRMUtils::WaitVBlank();
 }
 
 void* CWinSystemGbm::GetVaDisplay()

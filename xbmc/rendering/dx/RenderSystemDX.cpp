@@ -20,8 +20,10 @@
 #include <DirectXPackedVector.h>
 
 #include "Application.h"
+#if defined(TARGET_WINDOWS_DESKTOP)
 #include "cores/RetroPlayer/process/windows/RPProcessInfoWin.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPWinRenderer.h"
+#endif
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DXVA.h"
 #if defined(TARGET_WINDOWS_STORE)
@@ -87,9 +89,10 @@ bool CRenderSystemDX::InitRenderSystem()
   DXVA::CDecoder::Register();
   VIDEOPLAYER::CRendererFactory::ClearRenderer();
   CWinRenderer::Register();
+#if defined(TARGET_WINDOWS_DESKTOP)
   RETRO::CRPProcessInfoWin::Register();
   RETRO::CRPProcessInfoWin::RegisterRendererFactory(new RETRO::CWinRendererFactory);
-
+#endif
   m_viewPort = m_deviceResources->GetScreenViewport();
   RestoreViewPort();
 
@@ -106,7 +109,7 @@ void CRenderSystemDX::OnResize()
   if (!m_bRenderCreated)
     return;
 
-  auto outputSize = m_deviceResources->GetLogicalSize();
+  auto outputSize = m_deviceResources->GetOutputSize();
 
   // set camera to center of screen
   CPoint camPoint = { outputSize.Width * 0.5f, outputSize.Height * 0.5f };
@@ -531,7 +534,7 @@ void CRenderSystemDX::SetScissors(const CRect& rect)
   if (!m_bRenderCreated)
     return;
 
-  auto m_pContext = Get3D11Context();
+  auto m_pContext = m_deviceResources->GetD3DContext();
 
   m_scissor = rect;
   CD3D11_RECT scissor(MathUtils::round_int(rect.x1)
@@ -549,7 +552,7 @@ void CRenderSystemDX::ResetScissors()
   if (!m_bRenderCreated)
     return;
 
-  auto m_pContext = Get3D11Context();
+  auto m_pContext = m_deviceResources->GetD3DContext();
   auto outputSize = m_deviceResources->GetOutputSize();
 
   m_scissor.SetRect(0.0f, 0.0f,

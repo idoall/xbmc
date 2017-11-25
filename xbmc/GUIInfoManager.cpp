@@ -51,10 +51,11 @@
 #include "PlayListPlayer.h"
 #include "playlists/PlayList.h"
 #include "profiles/ProfilesManager.h"
-#include "windowing/WindowingFactory.h"
+#include "windowing/WinSystem.h"
 #include "powermanagement/PowerManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/DisplaySettings.h"
+#include "settings/GameSettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
 #include "settings/SkinSettings.h"
@@ -73,6 +74,7 @@
 #include <memory>
 #include <math.h>
 #include "cores/DataCacheCore.h"
+#include "cores/RetroPlayer/RetroPlayerUtils.h"
 #include "guiinfo/GUIInfoLabels.h"
 #include "messaging/ApplicationMessenger.h"
 
@@ -117,6 +119,7 @@
 
 #define SYSHEATUPDATEINTERVAL 60000
 
+using namespace KODI;
 using namespace XFILE;
 using namespace MUSIC_INFO;
 using namespace ADDON;
@@ -1483,6 +1486,27 @@ const infomap musicpartymode[] = {{ "enabled",           MUSICPM_ENABLED },
 ///                  _string_,
 ///     Todo
 ///   }
+///   \table_row3{   <b>`MusicPlayer.Property(Artist_Sortname)`</b>,
+///                  \anchor MusicPlayer_Property_Artist_Sortname
+///                  _string_,
+///     Sortname of the currently playing Artist
+///   }
+///   \table_row3{   <b>`MusicPlayer.Property(Artist_Type)`</b>,
+///                  \anchor MusicPlayer_Property_Artist_Type
+///                  _string_,
+///     Type of the currently playing Artist - person, group, orchestra, choir etc.
+///   }
+///   \table_row3{   <b>`MusicPlayer.Property(Artist_Gender)`</b>,
+///                  \anchor MusicPlayer_Property_Artist_Gender
+///                  _string_,
+///     Gender of the currently playing Artist - male, female, other
+///   }
+///   \table_row3{   <b>`MusicPlayer.Property(Artist_Disambiguation)`</b>,
+///                  \anchor MusicPlayer_Property_Artist_Disambiguation
+///                  _string_,
+///     Brief description of the currently playing Artist that differentiates them
+///     from others with the same name
+///   }
 ///   \table_row3{   <b>`MusicPlayer.Property(Artist_Born)`</b>,
 ///                  \anchor MusicPlayer_Property_Artist_Born
 ///                  _string_,
@@ -1684,16 +1708,6 @@ const infomap musicpartymode[] = {{ "enabled",           MUSICPM_ENABLED },
 ///                  _string_,
 ///     Channel name of the radio programme that's currently playing (PVR).
 ///   }
-///   \table_row3{   <b>`MusicPlayer.ChannelNumber`</b>,
-///                  \anchor MusicPlayer_ChannelNumber
-///                  _string_,
-///     Channel number of the radio programme that's currently playing (PVR).
-///   }
-///   \table_row3{   <b>`MusicPlayer.SubChannelNumber`</b>,
-///                  \anchor MusicPlayer_SubChannelNumber
-///                  _string_,
-///     Subchannel number of the radio channel that's currently playing (PVR).
-///   }
 ///   \table_row3{   <b>`MusicPlayer.ChannelNumberLabel`</b>,
 ///                  \anchor MusicPlayer_ChannelNumberLabel
 ///                  _string_,
@@ -1740,9 +1754,7 @@ const infomap musicplayer[] =    {{ "title",            MUSICPLAYER_TITLE },
                                   { "playcount",        MUSICPLAYER_PLAYCOUNT },
                                   { "lastplayed",       MUSICPLAYER_LASTPLAYED },
                                   { "channelname",      MUSICPLAYER_CHANNEL_NAME },
-                                  { "channelnumber",    MUSICPLAYER_CHANNEL_NUMBER },
-                                  { "subchannelnumber", MUSICPLAYER_SUB_CHANNEL_NUMBER },
-                                  { "channelnumberlabel", MUSICPLAYER_CHANNEL_NUMBER_LBL },
+                                  { "channelnumberlabel", MUSICPLAYER_CHANNEL_NUMBER },
                                   { "channelgroup",     MUSICPLAYER_CHANNEL_GROUP },
                                   { "dbid", MUSICPLAYER_DBID }
 };
@@ -2082,16 +2094,6 @@ const infomap musicplayer[] =    {{ "title",            MUSICPLAYER_TITLE },
 ///                  _string_,
 ///     Name of the currently tuned channel (PVR).
 ///   }
-///   \table_row3{   <b>`VideoPlayer.ChannelNumber`</b>,
-///                  \anchor VideoPlayer_ChannelNumber
-///                  _string_,
-///     Number of the currently tuned channel (PVR).
-///   }
-///   \table_row3{   <b>`VideoPlayer.SubChannelNumber`</b>,
-///                  \anchor VideoPlayer_SubChannelNumber
-///                  _string_,
-///     Subchannel number of the tv channel that's currently playing (PVR).
-///   }
 ///   \table_row3{   <b>`VideoPlayer.ChannelNumberLabel`</b>,
 ///                  \anchor VideoPlayer_ChannelNumberLabel
 ///                  _string_,
@@ -2167,9 +2169,7 @@ const infomap videoplayer[] =    {{ "title",            VIDEOPLAYER_TITLE },
                                   { "nextendtime",      VIDEOPLAYER_NEXT_ENDTIME },
                                   { "nextduration",     VIDEOPLAYER_NEXT_DURATION },
                                   { "channelname",      VIDEOPLAYER_CHANNEL_NAME },
-                                  { "channelnumber",    VIDEOPLAYER_CHANNEL_NUMBER },
-                                  { "subchannelnumber", VIDEOPLAYER_SUB_CHANNEL_NUMBER },
-                                  { "channelnumberlabel", VIDEOPLAYER_CHANNEL_NUMBER_LBL },
+                                  { "channelnumberlabel", VIDEOPLAYER_CHANNEL_NUMBER },
                                   { "channelgroup",     VIDEOPLAYER_CHANNEL_GROUP },
                                   { "hasepg",           VIDEOPLAYER_HAS_EPG },
                                   { "parentalrating",   VIDEOPLAYER_PARENTAL_RATING },
@@ -2179,6 +2179,29 @@ const infomap videoplayer[] =    {{ "title",            VIDEOPLAYER_TITLE },
                                   { "imdbnumber",       VIDEOPLAYER_IMDBNUMBER },
                                   { "episodename",      VIDEOPLAYER_EPISODENAME },
                                   { "dbid", VIDEOPLAYER_DBID }
+};
+
+/// \page modules__General__List_of_gui_access
+/// \section modules__General__List_of_gui_access_RetroPlayer RetroPlayer
+/// @{
+/// \table_start
+///   \table_h3{ Labels, Type, Description }
+///   \table_row3{   <b>`ViewMode`</b>,
+///                  \anchor RetroPlayer_ViewMode
+///                  _string_,
+///     Returns the view mode of the currently-playing game.\n
+///     The following values are possible:
+///     - normal
+///     - 4:3
+///     - 16:9
+///     - nonlinear
+///     - original
+///   }
+/// \table_end
+///
+/// -----------------------------------------------------------------------------
+/// @}
+const infomap retroplayer[] =  {{ "viewmode",            RETROPLAYER_VIEWMODE},
 };
 
 const infomap player_process[] =
@@ -2663,6 +2686,27 @@ const infomap container_str[]  = {{ "property",         CONTAINER_PROPERTY },
 ///                  \anchor ListItem_AlbumArtist
 ///                  _string_,
 ///     Shows the artist of the currently selected album in a list
+///   }
+///   \table_row3{   <b>`ListItem.Property(Artist_Sortname)`</b>,
+///                  \anchor ListItem_Property_Artist_Sortname
+///                  _string_,
+///     Sortname of the currently selected Artist
+///   }
+///   \table_row3{   <b>`ListItem.Property(Artist_Type)`</b>,
+///                  \anchor ListItem_Property_Artist_Type
+///                  _string_,
+///     Type of the currently selected Artist - person, group, orchestra, choir etc.
+///   }
+///   \table_row3{   <b>`ListItem.Property(Artist_Gender)`</b>,
+///                  \anchor ListItem_Property_Artist_Gender
+///                  _string_,
+///     Gender of the currently selected Artist - male, female, other
+///   }
+///   \table_row3{   <b>`ListItem.Property(Artist_Disambiguation)`</b>,
+///                  \anchor ListItem_Property_Artist_Disambiguation
+///                  _string_,
+///     Brief description of the currently selected Artist that differentiates them
+///     from others with the same name
 ///   }
 ///   \table_row3{   <b>`ListItem.Property(Artist_Born)`</b>,
 ///                  \anchor ListItem_Property_Artist_Born
@@ -3400,11 +3444,6 @@ const infomap container_str[]  = {{ "property",         CONTAINER_PROPERTY },
 ///                  _string_,
 ///     Playcount of Video in a container
 ///   }
-///   \table_row3{   <b>`ListItem.ChannelNumber`</b>,
-///                  \anchor ListItem_ChannelNumber
-///                  _string_,
-///     Number of current selected TV channel in a container
-///   }
 ///   \table_row3{   <b>`ListItem.ChannelName`</b>,
 ///                  \anchor ListItem_ChannelName
 ///                  _string_,
@@ -3606,12 +3645,6 @@ const infomap container_str[]  = {{ "property",         CONTAINER_PROPERTY },
 ///                  \anchor ListItem_ChannelGroup
 ///                  _string_,
 ///     Channel group of the selected item (PVR).
-///   }
-///   \table_row3{   <b>`ListItem.SubChannelNumber`</b>,
-///                  \anchor ListItem_SubChannelNumber
-///                  _string_,
-///     Subchannel number of the currently selected channel that's currently
-///     playing (PVR).
 ///   }
 ///   \table_row3{   <b>`ListItem.ChannelNumberLabel`</b>,
 ///                  \anchor ListItem_ChannelNumberLabel
@@ -3894,9 +3927,7 @@ const infomap listitem_labels[]= {{ "thumb",            LISTITEM_THUMB },
                                   { "nextstartdate",    LISTITEM_NEXT_STARTDATE },
                                   { "nextenddate",      LISTITEM_NEXT_ENDDATE },
                                   { "channelname",      LISTITEM_CHANNEL_NAME },
-                                  { "channelnumber",    LISTITEM_CHANNEL_NUMBER },
-                                  { "subchannelnumber", LISTITEM_SUB_CHANNEL_NUMBER },
-                                  { "channelnumberlabel", LISTITEM_CHANNEL_NUMBER_LBL },
+                                  { "channelnumberlabel", LISTITEM_CHANNEL_NUMBER },
                                   { "channelgroup",     LISTITEM_CHANNEL_GROUP },
                                   { "hasepg",           LISTITEM_HAS_EPG },
                                   { "hastimer",         LISTITEM_HASTIMER },
@@ -5550,6 +5581,14 @@ int CGUIInfoManager::TranslateSingleString(const std::string &strCondition, bool
           return videoplayer[i].val;
       }
     }
+    else if (cat.name == "retroplayer")
+    {
+      for (size_t i = 0; i < sizeof(retroplayer) / sizeof(infomap); i++)
+      {
+        if (prop.name == retroplayer[i].str)
+          return retroplayer[i].val;
+      }
+    }
     else if (cat.name == "slideshow")
     {
       for (size_t i = 0; i < sizeof(slideshow) / sizeof(infomap); i++)
@@ -6008,10 +6047,10 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
     strLabel = StringUtils::Format("%2.1f dB", CAEUtil::PercentToGain(g_application.GetVolume(false)));
     break;
   case PLAYER_SUBTITLE_DELAY:
-    strLabel = StringUtils::Format("%2.3f s", CMediaSettings::GetInstance().GetCurrentVideoSettings().m_SubtitleDelay);
+    strLabel = StringUtils::Format("%2.3f s", g_application.m_pPlayer->GetVideoSettings().m_SubtitleDelay);
     break;
   case PLAYER_AUDIO_DELAY:
-    strLabel = StringUtils::Format("%2.3f s", CMediaSettings::GetInstance().GetCurrentVideoSettings().m_AudioDelay);
+    strLabel = StringUtils::Format("%2.3f s", g_application.m_pPlayer->GetVideoSettings().m_AudioDelay);
     break;
   case PLAYER_CHAPTER:
     if(g_application.m_pPlayer->IsPlaying())
@@ -6135,8 +6174,6 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
   case MUSICPLAYER_LYRICS:
   case MUSICPLAYER_CHANNEL_NAME:
   case MUSICPLAYER_CHANNEL_NUMBER:
-  case MUSICPLAYER_SUB_CHANNEL_NUMBER:
-  case MUSICPLAYER_CHANNEL_NUMBER_LBL:
   case MUSICPLAYER_CHANNEL_GROUP:
   case MUSICPLAYER_PLAYCOUNT:
   case MUSICPLAYER_LASTPLAYED:
@@ -6181,8 +6218,6 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
   case VIDEOPLAYER_NEXT_DURATION:
   case VIDEOPLAYER_CHANNEL_NAME:
   case VIDEOPLAYER_CHANNEL_NUMBER:
-  case VIDEOPLAYER_SUB_CHANNEL_NUMBER:
-  case VIDEOPLAYER_CHANNEL_NUMBER_LBL:
   case VIDEOPLAYER_CHANNEL_GROUP:
   case VIDEOPLAYER_PARENTAL_RATING:
   case VIDEOPLAYER_PLAYCOUNT:
@@ -6192,6 +6227,9 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
   case VIDEOPLAYER_EPISODENAME:
     strLabel = GetVideoLabel(info);
   break;
+  case RETROPLAYER_VIEWMODE:
+    strLabel = GetGameLabel(info);
+    break;
   case VIDEOPLAYER_VIDEO_CODEC:
     if(g_application.m_pPlayer->IsPlaying())
     {
@@ -6382,7 +6420,7 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
     break;
 
   case SYSTEM_SCREEN_RESOLUTION:
-    if(g_Windowing.IsFullScreen())
+    if(CServiceBroker::GetWinSystem().IsFullScreen())
       strLabel = StringUtils::Format("%ix%i@%.2fHz - %s",
         CDisplaySettings::GetInstance().GetCurrentResolutionInfo().iScreenWidth,
         CDisplaySettings::GetInstance().GetCurrentResolutionInfo().iScreenHeight,
@@ -6640,35 +6678,35 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
     break;
   case NETWORK_IP_ADDRESS:
     {
-      CNetworkInterface* iface = g_application.getNetwork().GetFirstConnectedInterface();
+      CNetworkInterface* iface = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
       if (iface)
         return iface->GetCurrentIPAddress();
     }
     break;
   case NETWORK_SUBNET_MASK:
     {
-      CNetworkInterface* iface = g_application.getNetwork().GetFirstConnectedInterface();
+      CNetworkInterface* iface = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
       if (iface)
         return iface->GetCurrentNetmask();
     }
     break;
   case NETWORK_GATEWAY_ADDRESS:
     {
-      CNetworkInterface* iface = g_application.getNetwork().GetFirstConnectedInterface();
+      CNetworkInterface* iface = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
       if (iface)
         return iface->GetCurrentDefaultGateway();
     }
     break;
   case NETWORK_DNS1_ADDRESS:
     {
-      std::vector<std::string> nss = g_application.getNetwork().GetNameServers();
+      std::vector<std::string> nss = CServiceBroker::GetNetwork().GetNameServers();
       if (nss.size() >= 1)
         return nss[0];
     }
     break;
   case NETWORK_DNS2_ADDRESS:
     {
-      std::vector<std::string> nss = g_application.getNetwork().GetNameServers();
+      std::vector<std::string> nss = CServiceBroker::GetNetwork().GetNameServers();
       if (nss.size() >= 2)
         return nss[1];
     }
@@ -6683,7 +6721,7 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
     {
       std::string linkStatus = g_localizeStrings.Get(151);
       linkStatus += " ";
-      CNetworkInterface* iface = g_application.getNetwork().GetFirstConnectedInterface();
+      CNetworkInterface* iface = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
       if (iface && iface->IsConnected())
         linkStatus += g_localizeStrings.Get(15207);
       else
@@ -6744,13 +6782,13 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
     }
     break;
   case SYSTEM_RENDER_VENDOR:
-    strLabel = g_Windowing.GetRenderVendor();
+    strLabel = CServiceBroker::GetRenderSystem().GetRenderVendor();
     break;
   case SYSTEM_RENDER_RENDERER:
-    strLabel = g_Windowing.GetRenderRenderer();
+    strLabel = CServiceBroker::GetRenderSystem().GetRenderRenderer();
     break;
   case SYSTEM_RENDER_VERSION:
-    strLabel = g_Windowing.GetRenderVersionString();
+    strLabel = CServiceBroker::GetRenderSystem().GetRenderVersionString();
     break;
   }
 
@@ -7047,7 +7085,7 @@ bool CGUIInfoManager::GetBool(int condition1, int contextWindow, const CGUIListI
   else if (condition == SYSTEM_ISMASTER)
     bReturn = CProfilesManager::GetInstance().GetMasterProfile().getLockMode() != LOCK_MODE_EVERYONE && g_passwordManager.bMasterUser;
   else if (condition == SYSTEM_ISFULLSCREEN)
-    bReturn = g_Windowing.IsFullScreen();
+    bReturn = CServiceBroker::GetWinSystem().IsFullScreen();
   else if (condition == SYSTEM_ISSTANDALONE)
     bReturn = g_application.IsStandAlone();
   else if (condition == SYSTEM_ISINHIBIT)
@@ -8723,19 +8761,7 @@ std::string CGUIInfoManager::GetMusicTagLabel(int info, const CFileItem *item)
   case MUSICPLAYER_CHANNEL_NUMBER:
     {
       if (m_currentFile->HasPVRChannelInfoTag())
-        return StringUtils::Format("%i", m_currentFile->GetPVRChannelInfoTag()->ChannelNumber());
-    }
-    break;
-  case MUSICPLAYER_SUB_CHANNEL_NUMBER:
-    {
-      if (m_currentFile->HasPVRChannelInfoTag())
-        return StringUtils::Format("%i", m_currentFile->GetPVRChannelInfoTag()->SubChannelNumber());
-    }
-    break;
-  case MUSICPLAYER_CHANNEL_NUMBER_LBL:
-    {
-      if (m_currentFile->HasPVRChannelInfoTag())
-        return m_currentFile->GetPVRChannelInfoTag()->FormattedChannelNumber();
+        return m_currentFile->GetPVRChannelInfoTag()->ChannelNumber().FormattedChannelNumber();
     }
     break;
   case MUSICPLAYER_CHANNEL_GROUP:
@@ -8925,6 +8951,24 @@ std::string CGUIInfoManager::GetVideoLabel(int item)
   if (item == VIDEOPLAYER_TITLE)
     return GetLabel(PLAYER_TITLE);
 
+  return "";
+}
+
+std::string CGUIInfoManager::GetGameLabel(int item)
+{
+  if (!g_application.m_pPlayer->IsPlaying())
+    return "";
+
+  switch (item)
+  {
+    case RETROPLAYER_VIEWMODE:
+    {
+      ViewMode viewMode = CMediaSettings::GetInstance().GetCurrentGameSettings().ViewMode();
+      return RETRO::CRetroPlayerUtils::ViewModeToDescription(viewMode);
+    }
+    default:
+      break;
+  }
   return "";
 }
 
@@ -9186,6 +9230,8 @@ CTemperature CGUIInfoManager::GetGPUTemperature()
 #if defined(TARGET_DARWIN_OSX)
   value = SMCGetTemperature(SMC_KEY_GPU_TEMP);
   return CTemperature::CreateFromCelsius(value);
+#elif defined(TARGET_WINDOWS_STORE)
+  return CTemperature::CreateFromCelsius(0);
 #else
   std::string  cmd   = g_advancedSettings.m_gpuTempCmd;
   int         ret   = 0;
@@ -9577,15 +9623,15 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
     {
       CPVREpgInfoTagPtr tag(item->GetPVRChannelInfoTag()->GetEPGNow());
       if (tag)
-        return tag->Director();
+        return tag->GetDirectorsLabel();
     }
     if (item->HasEPGInfoTag())
-      return item->GetEPGInfoTag()->Director();
+      return item->GetEPGInfoTag()->GetDirectorsLabel();
     if (item->HasPVRTimerInfoTag())
     {
       const CPVREpgInfoTagPtr epgTag(item->GetPVRTimerInfoTag()->GetEpgInfoTag());
       if (epgTag)
-        return epgTag->Director();
+        return epgTag->GetDirectorsLabel();
     }
     if (item->HasVideoInfoTag())
       return StringUtils::Join(item->GetVideoInfoTag()->m_director, g_advancedSettings.m_videoItemSeparator);
@@ -9641,15 +9687,15 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
     if (item->HasPVRChannelInfoTag())
     {
       CPVREpgInfoTagPtr epgTag(item->GetPVRChannelInfoTag()->GetEPGNow());
-      return epgTag ? StringUtils::Join(epgTag->Genre(), g_advancedSettings.m_videoItemSeparator) : "";
+      return epgTag ? epgTag->GetGenresLabel() : "";
     }
     if (item->HasEPGInfoTag())
-      return StringUtils::Join(item->GetEPGInfoTag()->Genre(), g_advancedSettings.m_videoItemSeparator);
+      return item->GetEPGInfoTag()->GetGenresLabel();
     if (item->HasPVRTimerInfoTag())
     {
       const CPVREpgInfoTagPtr epgTag(item->GetPVRTimerInfoTag()->GetEpgInfoTag());
       if (epgTag)
-        return StringUtils::Join(epgTag->Genre(), g_advancedSettings.m_videoItemSeparator);
+        return epgTag->GetGenresLabel();
     }
     if (item->HasVideoInfoTag())
       return StringUtils::Join(item->GetVideoInfoTag()->m_genre, g_advancedSettings.m_videoItemSeparator);
@@ -9992,7 +10038,7 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
     if (item->HasVideoInfoTag())
       return item->GetVideoInfoTag()->GetCast();
     if (item->HasEPGInfoTag())
-      return item->GetEPGInfoTag()->Cast();
+      return item->GetEPGInfoTag()->GetCastLabel();
     break;
   case LISTITEM_CAST_AND_ROLE:
     if (item->HasVideoInfoTag())
@@ -10002,7 +10048,7 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
     if (item->HasVideoInfoTag())
       return StringUtils::Join(item->GetVideoInfoTag()->m_writingCredits, g_advancedSettings.m_videoItemSeparator);
     if (item->HasEPGInfoTag())
-      return item->GetEPGInfoTag()->Writer();
+      return item->GetEPGInfoTag()->GetWritersLabel();
     break;
   case LISTITEM_TAGLINE:
     if (item->HasVideoInfoTag())
@@ -10167,32 +10213,6 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
     break;
   case LISTITEM_CHANNEL_NUMBER:
     {
-      std::string number;
-      if (item->HasPVRChannelInfoTag())
-        number = StringUtils::Format("%i", item->GetPVRChannelInfoTag()->ChannelNumber());
-      if (item->HasEPGInfoTag() && item->GetEPGInfoTag()->HasChannel())
-        number = StringUtils::Format("%i", item->GetEPGInfoTag()->ChannelNumber());
-      if (item->HasPVRTimerInfoTag())
-        number = StringUtils::Format("%i", item->GetPVRTimerInfoTag()->ChannelNumber());
-
-      return number;
-    }
-    break;
-  case LISTITEM_SUB_CHANNEL_NUMBER:
-    {
-      std::string number;
-      if (item->HasPVRChannelInfoTag())
-        number = StringUtils::Format("%i", item->GetPVRChannelInfoTag()->SubChannelNumber());
-      if (item->HasEPGInfoTag() && item->GetEPGInfoTag()->HasChannel())
-        number = StringUtils::Format("%i", item->GetEPGInfoTag()->Channel()->SubChannelNumber());
-      if (item->HasPVRTimerInfoTag() && item->GetPVRTimerInfoTag()->HasChannel())
-        number = StringUtils::Format("%i", item->GetPVRTimerInfoTag()->Channel()->SubChannelNumber());
-
-      return number;
-    }
-    break;
-  case LISTITEM_CHANNEL_NUMBER_LBL:
-    {
       CPVRChannelPtr channel;
       if (item->HasPVRChannelInfoTag())
         channel = item->GetPVRChannelInfoTag();
@@ -10201,16 +10221,14 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
       else if (item->HasPVRTimerInfoTag())
         channel = item->GetPVRTimerInfoTag()->Channel();
 
-      return channel ?
-          channel->FormattedChannelNumber() :
-          "";
+      return channel ? channel->ChannelNumber().FormattedChannelNumber() : "";
     }
     break;
   case LISTITEM_CHANNEL_NAME:
     if (item->HasPVRChannelInfoTag())
       return item->GetPVRChannelInfoTag()->ChannelName();
     if (item->HasEPGInfoTag() && item->GetEPGInfoTag()->HasChannel())
-      return item->GetEPGInfoTag()->ChannelName();
+      return item->GetEPGInfoTag()->Channel()->ChannelName();
     if (item->HasPVRRecordingInfoTag())
       return item->GetPVRRecordingInfoTag()->m_strChannelName;
     if (item->HasPVRTimerInfoTag())
@@ -10277,7 +10295,7 @@ std::string CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::
     {
       CPVREpgInfoTagPtr tag(item->GetPVRChannelInfoTag()->GetEPGNext());
       if (tag)
-        return StringUtils::Join(tag->Genre(), g_advancedSettings.m_videoItemSeparator);
+        return tag->GetGenresLabel();
     }
     return "";
   case LISTITEM_NEXT_TITLE:

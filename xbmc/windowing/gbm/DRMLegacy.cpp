@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <drm/drm_mode.h>
+#include <drm_mode.h>
 #include <EGL/egl.h>
 #include <unistd.h>
 
@@ -51,8 +51,6 @@ static drmEventContext m_drm_evctx;
 
 bool CDRMLegacy::SetVideoMode(RESOLUTION_INFO res)
 {
-  CDRMUtils::GetMode(res);
-
   gbm_surface_release_buffer(m_gbm->surface, m_bo);
 
   m_bo = gbm_surface_lock_front_buffer(m_gbm->surface);
@@ -168,13 +166,6 @@ void CDRMLegacy::FlipPage(CGLContextEGL *pGLContext)
   }
 
   flip_happening = QueueFlip();
-
-  if(g_Windowing.NoOfBuffers() >= 3 && gbm_surface_has_free_buffers(m_gbm->surface))
-  {
-    return;
-  }
-
-  WaitingForFlip();
 }
 
 bool CDRMLegacy::InitDrmLegacy(drm *drm, gbm *gbm)

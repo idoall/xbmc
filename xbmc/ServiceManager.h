@@ -61,6 +61,8 @@ class CDataCacheCore;
 class CSettings;
 class IAE;
 class CFavouritesService;
+class CNetwork;
+class CWinSystemBase;
 
 namespace KODI
 {
@@ -106,6 +108,7 @@ public:
   ADDON::CServiceAddonManager& GetServiceAddons();
   ADDON::CRepositoryUpdater& GetRepositoryUpdater();
   ANNOUNCEMENT::CAnnouncementManager& GetAnnouncementManager();
+  CNetwork& GetNetwork();
 #ifdef HAS_PYTHON
   XBPython& GetXBPython();
 #endif
@@ -129,6 +132,9 @@ public:
   CInputManager &GetInputManager();
   CFileExtensionProvider &GetFileExtensionProvider();
 
+  CWinSystemBase &GetWinSystem();
+  void SetWinSystem(std::unique_ptr<CWinSystemBase> winSystem);
+
 protected:
   struct delete_dataCacheCore
   {
@@ -149,6 +155,9 @@ protected:
   {
     void operator()(CFavouritesService *p) const;
   };
+
+  //! \brief Initialize appropriate networking instance.
+  CNetwork* SetupNetwork() const;
 
   std::unique_ptr<ADDON::CAddonMgr> m_addonMgr;
   std::unique_ptr<ADDON::CBinaryAddonManager> m_binaryAddonManager;
@@ -174,4 +183,6 @@ protected:
   std::unique_ptr<CFavouritesService, delete_favouritesService> m_favouritesService;
   std::unique_ptr<CInputManager> m_inputManager;
   std::unique_ptr<CFileExtensionProvider> m_fileExtensionProvider;
+  std::unique_ptr<CNetwork> m_network;
+  std::unique_ptr<CWinSystemBase> m_winSystem;
 };

@@ -54,6 +54,7 @@
 #include "FileItem.h"
 #include "ServiceBroker.h"
 #include "URL.h"
+#include "windowing/WinSystem.h"
 
 using namespace KODI;
 using namespace GAME;
@@ -63,10 +64,12 @@ CRetroPlayer::CRetroPlayer(IPlayerCallback& callback) :
   IPlayer(callback),
   m_gameServices(CServiceBroker::GetGameServices())
 {
+  CServiceBroker::GetWinSystem().RegisterRenderLoop(this);
 }
 
 CRetroPlayer::~CRetroPlayer()
 {
+  CServiceBroker::GetWinSystem().UnregisterRenderLoop(this);
   CloseFile();
 }
 

@@ -1225,7 +1225,7 @@ namespace PVR
     const CPVRChannelPtr channel(item->GetPVRChannelInfoTag());
 
     /* check if the channel tag is valid */
-    if (!channel || channel->ChannelNumber() <= 0)
+    if (!channel || !channel->ChannelNumber().IsValid())
       return false;
 
     if (!CGUIDialogYesNo::ShowAndGetInput(CVariant{19054}, // "Hide channel"
@@ -1251,8 +1251,8 @@ namespace PVR
     if (!CServiceBroker::GetPVRManager().IsStarted() || IsRunningChannelScan())
       return false;
 
-    PVR_CLIENT scanClient;
-    std::vector<PVR_CLIENT> possibleScanClients = CServiceBroker::GetPVRManager().Clients()->GetClientsSupportingChannelScan();
+    CPVRClientPtr scanClient;
+    std::vector<CPVRClientPtr> possibleScanClients = CServiceBroker::GetPVRManager().Clients()->GetClientsSupportingChannelScan();
     m_bChannelScanRunning = true;
 
     /* multiple clients found */
@@ -1353,7 +1353,7 @@ namespace PVR
     // get client id
     if (iClientID < 0 && menuCategory == PVR_MENUHOOK_SETTING)
     {
-      PVR_CLIENTMAP clients;
+      CPVRClientMap clients;
       CServiceBroker::GetPVRManager().Clients()->GetCreatedClients(clients);
 
       if (clients.size() == 1)
@@ -1393,7 +1393,7 @@ namespace PVR
     if (iClientID < 0)
       iClientID = CServiceBroker::GetPVRManager().Clients()->GetPlayingClientID();
 
-    PVR_CLIENT client;
+    CPVRClientPtr client;
     if (CServiceBroker::GetPVRManager().Clients()->GetCreatedClient(iClientID, client) && client->HasMenuHooks(menuCategory))
     {
       CGUIDialogSelect* pDialog= g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
@@ -1463,8 +1463,6 @@ namespace PVR
 
     CDateTime::ResetTimezoneBias();
 
-    CServiceBroker::GetPVRManager().EpgContainer().Stop();
-
     pDlgProgress->SetHeading(CVariant{313}); // "Cleaning database"
     pDlgProgress->SetLine(0, CVariant{g_localizeStrings.Get(19187)}); // "Clearing all related data."
     pDlgProgress->SetLine(1, CVariant{""});
@@ -1482,60 +1480,57 @@ namespace PVR
     pDlgProgress->SetPercentage(10);
     pDlgProgress->Progress();
 
-    /* reset the EPG pointers */
-    const CPVRDatabasePtr database(CServiceBroker::GetPVRManager().GetTVDatabase());
-    if (database)
-      database->ResetEPG();
+    const CPVRDatabasePtr pvrDatabase(CServiceBroker::GetPVRManager().GetTVDatabase());
+    const CPVREpgDatabasePtr epgDatabase(CServiceBroker::GetPVRManager().EpgContainer().GetEpgDatabase());
 
-    /* stop the thread, close database */
+    // increase db open refcounts, so they don't get closed during following pvr manager shutdown
+    pvrDatabase->Open();
+    epgDatabase->Open();
+
+    // stop pvr manager; close both pvr and epg databases
     CServiceBroker::GetPVRManager().Stop();
 
-    pDlgProgress->SetPercentage(20);
+    /* reset the EPG pointers */
+    pvrDatabase->ResetEPG();
+    pDlgProgress->SetPercentage(bResetEPGOnly ? 40 : 20);
     pDlgProgress->Progress();
 
-    if (database && database->Open())
+    /* clean the EPG database */
+    epgDatabase->DeleteEpg();
+    pDlgProgress->SetPercentage(bResetEPGOnly ? 70 : 40);
+    pDlgProgress->Progress();
+
+    if (!bResetEPGOnly)
     {
-      /* clean the EPG database */
-      CServiceBroker::GetPVRManager().EpgContainer().Reset();
-      pDlgProgress->SetPercentage(30);
+      pvrDatabase->DeleteChannelGroups();
+      pDlgProgress->SetPercentage(60);
       pDlgProgress->Progress();
 
-      if (!bResetEPGOnly)
+      /* delete all channels */
+      pvrDatabase->DeleteChannels();
+      pDlgProgress->SetPercentage(70);
+      pDlgProgress->Progress();
+
+      pvrDatabase->DeleteClients();
+      pDlgProgress->SetPercentage(80);
+      pDlgProgress->Progress();
+
+      /* delete all channel and recording settings */
+      CVideoDatabase videoDatabase;
+
+      if (videoDatabase.Open())
       {
-        database->DeleteChannelGroups();
-        pDlgProgress->SetPercentage(50);
-        pDlgProgress->Progress();
-
-        /* delete all channels */
-        database->DeleteChannels();
-        pDlgProgress->SetPercentage(70);
-        pDlgProgress->Progress();
-
-        /* delete all channel and recording settings */
-        CVideoDatabase videoDatabase;
-
-        if (videoDatabase.Open())
-        {
-          videoDatabase.EraseVideoSettings("pvr://channels/");
-          videoDatabase.EraseVideoSettings(CPVRRecordingsPath::PATH_RECORDINGS);
-          videoDatabase.Close();
-        }
-
-        pDlgProgress->SetPercentage(80);
-        pDlgProgress->Progress();
-
-        /* delete all client information */
-        pDlgProgress->SetPercentage(90);
-        pDlgProgress->Progress();
+        videoDatabase.EraseVideoSettings("pvr://channels/");
+        videoDatabase.EraseVideoSettings(CPVRRecordingsPath::PATH_RECORDINGS);
+        videoDatabase.Close();
       }
-
-      database->Close();
     }
 
-    CLog::Log(LOGNOTICE,"CPVRGUIActions - %s - %s database cleared", __FUNCTION__, bResetEPGOnly ? "EPG" : "PVR and EPG");
+    // decrease db open refcounts; this actually closes dbs because refcounts drops to zero
+    pvrDatabase->Close();
+    epgDatabase->Close();
 
-    if (database)
-      database->Open();
+    CLog::Log(LOGNOTICE,"CPVRGUIActions - %s - %s database cleared", __FUNCTION__, bResetEPGOnly ? "EPG" : "PVR and EPG");
 
     CLog::Log(LOGNOTICE,"CPVRGUIActions - %s - restarting the PVRManager", __FUNCTION__);
     CServiceBroker::GetPVRManager().Start();
@@ -1596,37 +1591,40 @@ namespace PVR
 
   void CPVRChannelSwitchingInputHandler::OnInputDone()
   {
-    int iChannelNumber;
+    CPVRChannelNumber channelNumber;
     bool bSwitchToPreviousChannel;
+
     {
       CSingleLock lock(m_mutex);
-      iChannelNumber = GetChannelNumber();
+      channelNumber = GetChannelNumber();
       // special case. if only a single zero was typed in, switch to previously played channel.
-      bSwitchToPreviousChannel = (iChannelNumber == 0 && GetCurrentDigitCount() == 1);
+      bSwitchToPreviousChannel = (channelNumber.GetChannelNumber() == 0 && GetCurrentDigitCount() == 1);
     }
 
-    if (iChannelNumber > 0)
-      SwitchToChannel(iChannelNumber);
+    if (channelNumber.GetChannelNumber())
+      SwitchToChannel(channelNumber);
     else if (bSwitchToPreviousChannel)
       SwitchToPreviousChannel();
   }
 
-  void CPVRChannelSwitchingInputHandler::SwitchToChannel(int iChannelNumber)
+  void CPVRChannelSwitchingInputHandler::SwitchToChannel(const CPVRChannelNumber& channelNumber)
   {
-    if (iChannelNumber > 0 && CServiceBroker::GetPVRManager().IsPlaying())
+    if (channelNumber.IsValid() && CServiceBroker::GetPVRManager().IsPlaying())
     {
       const CPVRChannelPtr playingChannel(CServiceBroker::GetPVRManager().GetCurrentChannel());
       if (playingChannel)
       {
-        if (iChannelNumber != playingChannel->ChannelNumber())
+        if (channelNumber != playingChannel->ChannelNumber())
         {
           const CPVRChannelGroupPtr selectedGroup(CServiceBroker::GetPVRManager().GetPlayingGroup(playingChannel->IsRadio()));
-          const CFileItemPtr channel(selectedGroup->GetByChannelNumber(iChannelNumber));
+          const CFileItemPtr channel(selectedGroup->GetByChannelNumber(channelNumber));
           if (channel && channel->HasPVRChannelInfoTag())
           {
             CApplicationMessenger::GetInstance().PostMsg(
               TMSG_GUI_ACTION, WINDOW_INVALID, -1,
-              static_cast<void*>(new CAction(ACTION_CHANNEL_SWITCH, static_cast<float>(iChannelNumber))));
+              static_cast<void*>(new CAction(ACTION_CHANNEL_SWITCH,
+                                             static_cast<float>(channelNumber.GetChannelNumber()),
+                                             static_cast<float>(channelNumber.GetSubChannelNumber()))));
           }
         }
       }
@@ -1647,9 +1645,12 @@ namespace PVR
           const CFileItemPtr channel(group->GetLastPlayedChannel(playingChannel->ChannelID()));
           if (channel && channel->HasPVRChannelInfoTag())
           {
+            const CPVRChannelNumber channelNumber = channel->GetPVRChannelInfoTag()->ChannelNumber();
             CApplicationMessenger::GetInstance().SendMsg(
               TMSG_GUI_ACTION, WINDOW_INVALID, -1,
-              static_cast<void*>(new CAction(ACTION_CHANNEL_SWITCH, static_cast<float>(channel->GetPVRChannelInfoTag()->ChannelNumber()))));
+              static_cast<void*>(new CAction(ACTION_CHANNEL_SWITCH,
+                                             static_cast<float>(channelNumber.GetChannelNumber()),
+                                             static_cast<float>(channelNumber.GetSubChannelNumber()))));
           }
         }
       }

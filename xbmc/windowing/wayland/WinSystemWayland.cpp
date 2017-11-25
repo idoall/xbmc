@@ -147,7 +147,7 @@ struct MsgBufferScale
 CWinSystemWayland::CWinSystemWayland()
 : CWinSystemBase{}, m_protocol{"WinSystemWaylandInternal"}
 {
-  m_eWindowSystem = WINDOW_SYSTEM_WAYLAND;
+  m_winEvents.reset(new CWinEventsWayland());
 }
 
 CWinSystemWayland::~CWinSystemWayland() noexcept
@@ -831,7 +831,8 @@ void CWinSystemWayland::SetResolutionInternal(CSizeInt size, std::int32_t scale,
         XBMC_Event msg{XBMC_MODECHANGE};
         msg.mode.res = RES_WINDOW;
         SetWindowResolution(sizes.bufferSize.Width(), sizes.bufferSize.Height());
-        CWinEvents::MessagePush(&msg);
+        // FIXME
+        dynamic_cast<CWinEventsWayland&>(*m_winEvents).MessagePush(&msg);
         m_waitingForApply = true;
         CLog::LogF(LOGDEBUG, "Queued change to windowed mode size %dx%d", sizes.bufferSize.Width(), sizes.bufferSize.Height());
       }
@@ -839,7 +840,8 @@ void CWinSystemWayland::SetResolutionInternal(CSizeInt size, std::int32_t scale,
       {
         XBMC_Event msg{XBMC_VIDEORESIZE};
         msg.resize = {sizes.bufferSize.Width(), sizes.bufferSize.Height()};
-        CWinEvents::MessagePush(&msg);
+        // FIXME
+        dynamic_cast<CWinEventsWayland&>(*m_winEvents).MessagePush(&msg);
         m_waitingForApply = true;
         CLog::LogF(LOGDEBUG, "Queued change to windowed buffer size %dx%d", sizes.bufferSize.Width(), sizes.bufferSize.Height());
       }
@@ -861,7 +863,8 @@ void CWinSystemWayland::SetResolutionInternal(CSizeInt size, std::int32_t scale,
 
       XBMC_Event msg{XBMC_MODECHANGE};
       msg.mode.res = res;
-      CWinEvents::MessagePush(&msg);
+      // FIXME
+      dynamic_cast<CWinEventsWayland&>(*m_winEvents).MessagePush(&msg);
       m_waitingForApply = true;
       CLog::LogF(LOGDEBUG, "Queued change to resolution %d surface size %dx%d scale %d state %s", res, sizes.surfaceSize.Width(), sizes.surfaceSize.Height(), scale, IShellSurface::StateToString(state).c_str());
     }
@@ -1173,7 +1176,8 @@ void CWinSystemWayland::OnLeave(std::uint32_t seatGlobalName, InputType type)
 
 void CWinSystemWayland::OnEvent(std::uint32_t seatGlobalName, InputType type, XBMC_Event& event)
 {
-  CWinEvents::MessagePush(&event);
+  // FIXME
+  dynamic_cast<CWinEventsWayland&>(*m_winEvents).MessagePush(&event);
 }
 
 void CWinSystemWayland::OnSetCursor(wayland::pointer_t& pointer, std::uint32_t serial)
@@ -1350,7 +1354,7 @@ std::unique_ptr<CVideoSync> CWinSystemWayland::GetVideoSync(void* clock)
   if (m_surface && m_presentation)
   {
     CLog::LogF(LOGINFO, "Using presentation protocol for video sync");
-    return std::unique_ptr<CVideoSync>(new CVideoSyncWpPresentation(clock));
+    return std::unique_ptr<CVideoSync>(new CVideoSyncWpPresentation(clock, *this));
   }
   else
   {

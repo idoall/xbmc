@@ -18,11 +18,8 @@
  *
  */
 
-#if defined (HAVE_LIBVA)
-#include <va/va_drm.h>
-#include "cores/VideoPlayer/DVDCodecs/Video/VAAPI.h"
-#include "cores/VideoPlayer/VideoRenderers/HwDecRender/RendererVAAPIGLES.h"
-#endif
+#include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecDRMPRIME.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/RendererDRMPRIME.h"
 
 #include "cores/RetroPlayer/process/RPProcessInfo.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererGuiTexture.h"
@@ -34,6 +31,32 @@
 #include "utils/log.h"
 
 using namespace KODI;
+
+std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
+{
+  std::unique_ptr<CWinSystemBase> winSystem(new CWinSystemGbmGLESContext());
+  return winSystem;
+}
+
+#if defined (HAVE_LIBVA)
+#include <va/va_drm.h>
+#include "cores/VideoPlayer/DVDCodecs/Video/VAAPI.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/RendererVAAPIGLES.h"
+
+class CVaapiProxy : public VAAPI::IVaapiWinSystem
+{
+public:
+  CVaapiProxy(CWinSystemGbmGLESContext &winSystem) : m_winSystem(winSystem) {};
+  VADisplay GetVADisplay() override { return m_winSystem.GetVaDisplay(); };
+  void *GetEGLDisplay() override { return m_winSystem.GetEGLDisplay(); };
+protected:
+  CWinSystemGbmGLESContext &m_winSystem;
+};
+#else
+class CVaapiProxy
+{
+};
+#endif
 
 bool CWinSystemGbmGLESContext::InitWindowSystem()
 {
@@ -53,14 +76,18 @@ bool CWinSystemGbmGLESContext::InitWindowSystem()
   }
 
 #if defined (HAVE_LIBVA)
+  m_vaapiProxy.reset(new CVaapiProxy(*this));
   VADisplay vaDpy = static_cast<VADisplay>(CWinSystemGbm::GetVaDisplay());
   bool general, hevc;
-  CRendererVAAPI::Register(vaDpy, m_pGLContext.m_eglDisplay, general, hevc);
+  CRendererVAAPI::Register(m_vaapiProxy.get(), vaDpy, m_pGLContext.m_eglDisplay, general, hevc);
   if (general)
   {
-    VAAPI::CDecoder::Register(hevc);
+    VAAPI::CDecoder::Register(m_vaapiProxy.get(), hevc);
   }
 #endif
+
+  CRendererDRMPRIME::Register();
+  CDVDVideoCodecDRMPRIME::Register();
 
   return true;
 }
@@ -134,12 +161,19 @@ bool CWinSystemGbmGLESContext::SetFullScreen(bool fullScreen, RESOLUTION_INFO& r
   return true;
 }
 
-void CWinSystemGbmGLESContext::PresentRenderImpl(bool rendered)
+void CWinSystemGbmGLESContext::PresentRender(bool rendered, bool videoLayer)
 {
+  if (!m_bRenderCreated)
+    return;
+
   if (rendered)
   {
     m_pGLContext.SwapBuffers();
     CWinSystemGbm::FlipPage(&m_pGLContext);
+  }
+  else
+  {
+    CWinSystemGbm::WaitVBlank();
   }
 }
 

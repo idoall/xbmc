@@ -22,7 +22,11 @@
 #include "Interfaces/AESink.h"
 #if defined(TARGET_WINDOWS)
   #include "Sinks/AESinkWASAPI.h"
-  #include "Sinks/AESinkDirectSound.h"
+  #if defined(TARGET_WINDOWS_DESKTOP)
+    #include "Sinks/AESinkDirectSound.h"
+  #else // TARGET_WINDOWS_STORE
+    #include "Sinks/AESinkXAudio.h"
+  #endif // TARGET_WINDOWS
 #elif defined(TARGET_ANDROID)
   #include "Sinks/AESinkAUDIOTRACK.h"
 #elif defined(TARGET_RASPBERRY_PI)
@@ -67,7 +71,11 @@ void CAESinkFactory::ParseDevice(std::string &device, std::string &driver)
     if (
 #if defined(TARGET_WINDOWS)
         driver == "WASAPI"      ||
+  #if defined(TARGET_WINDOWS_DESKTOP)
         driver == "DIRECTSOUND" ||
+  #else // TARGET_WINDOWS_STORE
+        driver == "XAUDIO"      ||
+  #endif
 #elif defined(TARGET_ANDROID)
         driver == "AUDIOTRACK"  ||
 #elif defined(TARGET_RASPBERRY_PI)
@@ -113,8 +121,13 @@ IAESink *CAESinkFactory::TrySink(const std::string &driver, std::string &device,
 #if defined(TARGET_WINDOWS)
     if (driver == "WASAPI")
       sink = new CAESinkWASAPI();
+  #if defined(TARGET_WINDOWS_DESKTOP)
     else if (driver == "DIRECTSOUND")
       sink = new CAESinkDirectSound();
+  #else // TARGET_WINDOWS_STORE
+    else if (driver == "XAUDIO")
+      sink = new CAESinkXAudio();
+  #endif
 #elif defined(TARGET_ANDROID)
     sink = new CAESinkAUDIOTRACK();
 #elif defined(TARGET_RASPBERRY_PI)
@@ -192,12 +205,23 @@ void CAESinkFactory::EnumerateEx(AESinkInfoList &list, bool force)
 {
   AESinkInfo info;
 #if defined(TARGET_WINDOWS)
+  #if defined(TARGET_WINDOWS_DESKTOP)
 
   info.m_deviceInfoList.clear();
   info.m_sinkName = "DIRECTSOUND";
   CAESinkDirectSound::EnumerateDevicesEx(info.m_deviceInfoList, force);
   if(!info.m_deviceInfoList.empty())
     list.push_back(info);
+
+  #else // TARGET_WINDOWS_STORE
+
+  info.m_deviceInfoList.clear();
+  info.m_sinkName = "XAUDIO";
+  CAESinkXAudio::EnumerateDevicesEx(info.m_deviceInfoList, force);
+  if (!info.m_deviceInfoList.empty())
+    list.push_back(info);
+
+  #endif
 
   info.m_deviceInfoList.clear();
   info.m_sinkName = "WASAPI";

@@ -38,8 +38,10 @@
 #include "interfaces/generic/ScriptInvocationManager.h"
 #include "interfaces/python/XBPython.h"
 #include "pvr/PVRManager.h"
+#include "network/Network.h"
 #include "settings/Settings.h"
 #include "utils/FileExtensionProvider.h"
+#include "windowing/WinSystem.h"
 
 using namespace KODI;
 
@@ -62,6 +64,7 @@ bool CServiceManager::InitStageOne()
   m_playlistPlayer.reset(new PLAYLIST::CPlayListPlayer());
 
   m_settings.reset(new CSettings());
+  m_network.reset(SetupNetwork());
 
   init_level = 1;
   return true;
@@ -200,6 +203,7 @@ void CServiceManager::DeinitStageOne()
 {
   init_level = 0;
 
+  m_network.reset();
   m_settings.reset();
   m_playlistPlayer.reset();
 #ifdef HAS_PYTHON
@@ -322,6 +326,16 @@ CFileExtensionProvider& CServiceManager::GetFileExtensionProvider()
   return *m_fileExtensionProvider;
 }
 
+CWinSystemBase &CServiceManager::GetWinSystem()
+{
+  return *m_winSystem.get();
+}
+
+void CServiceManager::SetWinSystem(std::unique_ptr<CWinSystemBase> winSystem)
+{
+  m_winSystem = std::move(winSystem);
+}
+
 // deleters for unique_ptr
 void CServiceManager::delete_dataCacheCore::operator()(CDataCacheCore *p) const
 {
@@ -342,3 +356,24 @@ void CServiceManager::delete_favouritesService::operator()(CFavouritesService *p
 {
   delete p;
 }
+
+CNetwork* CServiceManager::SetupNetwork() const
+{
+#if defined(TARGET_ANDROID)
+  return new CNetworkAndroid();
+#elif defined(HAS_LINUX_NETWORK)
+  return new CNetworkLinux();
+#elif defined(HAS_WIN32_NETWORK)
+  return new CNetworkWin32();
+#elif defined(HAS_WIN10_NETWORK)
+  return new CNetworkWin10();
+#else
+  return new CNetwork();
+#endif
+}
+
+CNetwork& CServiceManager::GetNetwork()
+{
+  return *m_network;
+}
+

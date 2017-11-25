@@ -5,6 +5,7 @@ set(SOURCES AEResampleFactory.cpp
             Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPDatabase.cpp
             Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPMode.cpp
             Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPProcess.cpp
+            Engines/ActiveAE/AudioDSPAddons/AudioDSPSettings.cpp
             Encoders/AEEncoderFFmpeg.cpp
             Engines/ActiveAE/ActiveAE.cpp
             Engines/ActiveAE/ActiveAEBuffer.cpp
@@ -29,6 +30,7 @@ set(HEADERS AEResampleFactory.h
             Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPDatabase.h
             Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPMode.h
             Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPProcess.h
+            Engines/ActiveAE/AudioDSPAddons/AudioDSPSettings.h
             Encoders/AEEncoderFFmpeg.h
             Engines/ActiveAE/ActiveAE.h
             Engines/ActiveAE/ActiveAEBuffer.h
@@ -84,11 +86,20 @@ if(FFMPEG_FOUND)
   list(APPEND HEADERS Engines/ActiveAE/ActiveAEResampleFFMPEG.h)
 endif()
 
-if(CORE_SYSTEM_NAME STREQUAL windows)
-  list(APPEND SOURCES Sinks/AESinkDirectSound.cpp
-                      Sinks/AESinkWASAPI.cpp)
-  list(APPEND HEADERS Sinks/AESinkDirectSound.h
-                      Sinks/AESinkWASAPI.h)
+if(CORE_SYSTEM_NAME MATCHES windows)
+  list(APPEND SOURCES Sinks/AESinkWASAPI.cpp
+                      Sinks/windows/AESinkFactoryWin.cpp)
+  list(APPEND HEADERS Sinks/AESinkWASAPI.h
+                      Sinks/windows/AESinkFactoryWin.h)
+  if(CORE_SYSTEM_NAME STREQUAL windowsstore)
+    list(APPEND SOURCES Sinks/AESinkXAudio.cpp
+                        Sinks/windows/AESinkFactoryWin10.cpp)
+    list(APPEND SOURCES Sinks/AESinkXAudio.h)
+  elseif(CORE_SYSTEM_NAME STREQUAL windows)
+    list(APPEND SOURCES Sinks/AESinkDirectSound.cpp
+                        Sinks/windows/AESinkFactoryWin32.cpp)
+    list(APPEND SOURCES Sinks/AESinkDirectSound.h)
+  endif()
 endif()
 
 if(CORE_PLATFORM_NAME_LC STREQUAL rbpi)
@@ -134,7 +145,7 @@ endif()
 
 core_add_library(audioengine)
 target_include_directories(${CORE_LIBRARY} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-if(NOT CORE_SYSTEM_NAME STREQUAL windows)
+if(NOT CORE_SYSTEM_NAME STREQUAL windows AND NOT CORE_SYSTEM_NAME STREQUAL windowsstore)
   if(HAVE_SSE)
     target_compile_options(${CORE_LIBRARY} PRIVATE -msse)
   endif()

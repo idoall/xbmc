@@ -22,6 +22,7 @@
 #include "system.h"
 
 #include "VideoSyncIos.h"
+#include "WinEventsIOS.h"
 #include "WinSystemIOS.h"
 #include "cores/RetroPlayer/process/ios/RPProcessInfoIOS.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererGuiTexture.h"
@@ -71,15 +72,19 @@ struct CADisplayLinkWrapper
   IOSDisplayLinkCallback *callbackClass;
 };
 
+std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
+{
+  std::unique_ptr<CWinSystemBase> winSystem(new CWinSystemIOS());
+  return winSystem;
+}
+
 CWinSystemIOS::CWinSystemIOS() : CWinSystemBase()
 {
-  m_eWindowSystem = WINDOW_SYSTEM_IOS;
-
   m_iVSyncErrors = 0;
   m_bIsBackgrounded = false;
   m_pDisplayLink = new CADisplayLinkWrapper;
   m_pDisplayLink->callbackClass = [[IOSDisplayLinkCallback alloc] init];
-
+  m_winEvents.reset(new CWinEventsIOS());
 }
 
 CWinSystemIOS::~CWinSystemIOS()
@@ -501,6 +506,6 @@ void* CWinSystemIOS::GetEAGLContextObj()
 
 std::unique_ptr<CVideoSync> CWinSystemIOS::GetVideoSync(void *clock)
 {
-  std::unique_ptr<CVideoSync> pVSync(new CVideoSyncIos(clock));
+  std::unique_ptr<CVideoSync> pVSync(new CVideoSyncIos(clock, *this));
   return pVSync;
 }

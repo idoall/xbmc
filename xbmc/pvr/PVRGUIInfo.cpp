@@ -184,7 +184,7 @@ void CPVRGUIInfo::UpdateQualityData(void)
   PVR_SIGNAL_STATUS qualityInfo;
   ClearQualityInfo(qualityInfo);
 
-  PVR_CLIENT client;
+  CPVRClientPtr client;
   if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_PVRPLAYBACK_SIGNALQUALITY) &&
       CServiceBroker::GetPVRManager().Clients()->GetPlayingClient(client))
   {
@@ -199,7 +199,7 @@ void CPVRGUIInfo::UpdateDescrambleData(void)
   PVR_DESCRAMBLE_INFO descrambleInfo;
   ClearDescrambleInfo(descrambleInfo);
 
-  PVR_CLIENT client;
+  CPVRClientPtr client;
   if (CServiceBroker::GetPVRManager().Clients()->GetPlayingClient(client) &&
       client->GetDescrambleInfo(descrambleInfo))
     memcpy(&m_descrambleInfo, &descrambleInfo, sizeof(m_descrambleInfo));
@@ -606,22 +606,12 @@ bool CPVRGUIInfo::GetVideoLabel(const CFileItem &item, int iLabel, std::string &
         strValue = recording->m_strChannelName;
         return true;
       }
-      case VIDEOPLAYER_SUB_CHANNEL_NUMBER:
+      case VIDEOPLAYER_CHANNEL_NUMBER:
       {
         const CPVRChannelPtr channel = recording->Channel();
         if (channel)
         {
-          strValue = StringUtils::Format("%i", channel->SubChannelNumber());
-          return true;
-        }
-        break;
-      }
-      case VIDEOPLAYER_CHANNEL_NUMBER_LBL:
-      {
-        const CPVRChannelPtr channel = recording->Channel();
-        if (channel)
-        {
-          strValue = channel->FormattedChannelNumber();
+          strValue = channel->ChannelNumber().FormattedChannelNumber();
           return true;
         }
         break;
@@ -656,7 +646,7 @@ bool CPVRGUIInfo::GetVideoLabel(const CFileItem &item, int iLabel, std::string &
       }
       case VIDEOPLAYER_GENRE:
       {
-        GET_CURRENT_VIDEO_LABEL(StringUtils::Join(epgTag->Genre(), g_advancedSettings.m_videoItemSeparator));
+        GET_CURRENT_VIDEO_LABEL(epgTag->GetGenresLabel());
       }
       case VIDEOPLAYER_PLOT:
       {
@@ -714,15 +704,15 @@ bool CPVRGUIInfo::GetVideoLabel(const CFileItem &item, int iLabel, std::string &
       }
       case VIDEOPLAYER_CAST:
       {
-        GET_CURRENT_VIDEO_LABEL(epgTag->Cast());
+        GET_CURRENT_VIDEO_LABEL(epgTag->GetCastLabel());
       }
       case VIDEOPLAYER_DIRECTOR:
       {
-        GET_CURRENT_VIDEO_LABEL(epgTag->Director());
+        GET_CURRENT_VIDEO_LABEL(epgTag->GetDirectorsLabel());
       }
       case VIDEOPLAYER_WRITER:
       {
-        GET_CURRENT_VIDEO_LABEL(epgTag->Writer());
+        GET_CURRENT_VIDEO_LABEL(epgTag->GetWritersLabel());
       }
       case VIDEOPLAYER_PARENTAL_RATING:
       {
@@ -739,7 +729,7 @@ bool CPVRGUIInfo::GetVideoLabel(const CFileItem &item, int iLabel, std::string &
       }
       case VIDEOPLAYER_NEXT_GENRE:
       {
-        GET_NEXT_VIDEO_LABEL(StringUtils::Join(epgTag->Genre(), g_advancedSettings.m_videoItemSeparator));
+        GET_NEXT_VIDEO_LABEL(epgTag->GetGenresLabel());
       }
       case VIDEOPLAYER_NEXT_PLOT:
       {
@@ -782,31 +772,7 @@ bool CPVRGUIInfo::GetVideoLabel(const CFileItem &item, int iLabel, std::string &
 
         if (channel)
         {
-          strValue = StringUtils::Format("%i", channel->ChannelNumber());
-          return true;
-        }
-        break;
-      }
-      case VIDEOPLAYER_SUB_CHANNEL_NUMBER:
-      {
-        if (!channel && epgTag)
-          channel = epgTag->Channel();
-
-        if (channel)
-        {
-          strValue = StringUtils::Format("%i", channel->SubChannelNumber());
-          return true;
-        }
-        break;
-      }
-      case VIDEOPLAYER_CHANNEL_NUMBER_LBL:
-      {
-        if (!channel && epgTag)
-          channel = epgTag->Channel();
-
-        if (channel)
-        {
-          strValue = channel->FormattedChannelNumber();
+          strValue = channel->ChannelNumber().FormattedChannelNumber();
           return true;
         }
         break;

@@ -595,11 +595,10 @@ static void DisplayReconfigured(CGDirectDisplayID display,
     winsys->UpdateResolutions();
 }
 
-//---------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 CWinSystemOSX::CWinSystemOSX() : CWinSystemBase(), m_lostDeviceTimer(this)
 {
-  m_eWindowSystem = WINDOW_SYSTEM_OSX;
   m_glContext = 0;
   m_SDLSurface = NULL;
   m_osx_events = NULL;
@@ -611,6 +610,8 @@ CWinSystemOSX::CWinSystemOSX() : CWinSystemBase(), m_lostDeviceTimer(this)
   m_movedToOtherScreen = false;
   m_refreshRate = 0.0;
   m_delayDispReset = false;
+
+  m_winEvents.reset(new CWinEventsOSX());
 }
 
 CWinSystemOSX::~CWinSystemOSX()

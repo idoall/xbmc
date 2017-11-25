@@ -39,7 +39,6 @@
 #include "HTTPDirectory.h"
 #include "DAVDirectory.h"
 #include "UDFDirectory.h"
-#include "Application.h"
 #include "utils/log.h"
 #include "network/WakeOnAccess.h"
 
@@ -90,6 +89,9 @@
 #include "ResourceDirectory.h"
 #include "ServiceBroker.h"
 #include "addons/VFSEntry.h"
+#ifdef TARGET_WINDOWS_STORE
+#include "filesystem/win10/WinLibraryDirectory.h"
+#endif
 
 using namespace ADDON;
 
@@ -150,7 +152,7 @@ IDirectory* CDirectoryFactory::Create(const CURL& url)
   if (url.IsProtocol("resource")) return new CResourceDirectory();
   if (url.IsProtocol("events")) return new CEventsDirectory();
 
-  bool networkAvailable = g_application.getNetwork().IsAvailable();
+  bool networkAvailable = CServiceBroker::GetNetwork().IsAvailable();
   if (networkAvailable)
   {
     if (url.IsProtocol("ftp") || url.IsProtocol("ftps")) return new CFTPDirectory();
@@ -176,6 +178,9 @@ IDirectory* CDirectoryFactory::Create(const CURL& url)
 #endif
 #ifdef HAS_FILESYSTEM_NFS
     if (url.IsProtocol("nfs")) return new CNFSDirectory();
+#endif
+#ifdef TARGET_WINDOWS_STORE
+    if (CWinLibraryDirectory::IsValid(url)) return new CWinLibraryDirectory();
 #endif
   }
 

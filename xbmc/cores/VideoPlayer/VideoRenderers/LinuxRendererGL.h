@@ -28,7 +28,7 @@
 
 #include "FrameBufferObject.h"
 #include "guilib/Shader.h"
-#include "settings/VideoSettings.h"
+#include "cores/VideoSettings.h"
 #include "RenderFlags.h"
 #include "RenderInfo.h"
 #include "guilib/GraphicContext.h"
@@ -38,6 +38,7 @@
 #include "VideoShaders/ShaderFormats.h"
 
 class CRenderCapture;
+class CRenderSystemGL;
 
 class CBaseTexture;
 namespace Shaders { class BaseYUV2RGBGLSLShader; }
@@ -178,6 +179,7 @@ protected:
   GLenum m_textureTarget;
   int m_renderMethod;
   RenderQuality m_renderQuality;
+  CRenderSystemGL *m_renderSystem;
   
   // Raw data used by renderer
   int m_currentField;

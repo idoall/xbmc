@@ -220,6 +220,7 @@ const std::string CSettings::SETTING_SCRAPERS_MUSICVIDEOSDEFAULT = "scrapers.mus
 const std::string CSettings::SETTING_PVRMANAGER_SYNCCHANNELGROUPS = "pvrmanager.syncchannelgroups";
 const std::string CSettings::SETTING_PVRMANAGER_BACKENDCHANNELORDER = "pvrmanager.backendchannelorder";
 const std::string CSettings::SETTING_PVRMANAGER_USEBACKENDCHANNELNUMBERS = "pvrmanager.usebackendchannelnumbers";
+const std::string CSettings::SETTING_PVRMANAGER_CLIENTPRIORITIES = "pvrmanager.clientpriorities";
 const std::string CSettings::SETTING_PVRMANAGER_CHANNELMANAGER = "pvrmanager.channelmanager";
 const std::string CSettings::SETTING_PVRMANAGER_GROUPMANAGER = "pvrmanager.groupmanager";
 const std::string CSettings::SETTING_PVRMANAGER_CHANNELSCAN = "pvrmanager.channelscan";
@@ -259,6 +260,7 @@ const std::string CSettings::SETTING_PVRCLIENT_MENUHOOK = "pvrclient.menuhook";
 const std::string CSettings::SETTING_PVRTIMERS_HIDEDISABLEDTIMERS = "pvrtimers.hidedisabledtimers";
 const std::string CSettings::SETTING_MUSICLIBRARY_SHOWCOMPILATIONARTISTS = "musiclibrary.showcompilationartists";
 const std::string CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO = "musiclibrary.downloadinfo";
+const std::string CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER = "musiclibrary.artistsfolder";
 const std::string CSettings::SETTING_MUSICLIBRARY_ALBUMSSCRAPER = "musiclibrary.albumsscraper";
 const std::string CSettings::SETTING_MUSICLIBRARY_ARTISTSSCRAPER = "musiclibrary.artistsscraper";
 const std::string CSettings::SETTING_MUSICLIBRARY_OVERRIDETAGS = "musiclibrary.overridetags";
@@ -267,6 +269,13 @@ const std::string CSettings::SETTING_MUSICLIBRARY_UPDATEONSTARTUP = "musiclibrar
 const std::string CSettings::SETTING_MUSICLIBRARY_BACKGROUNDUPDATE = "musiclibrary.backgroundupdate";
 const std::string CSettings::SETTING_MUSICLIBRARY_CLEANUP = "musiclibrary.cleanup";
 const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT = "musiclibrary.export";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_FILETYPE = "musiclibrary.exportfiletype";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER = "musiclibrary.exportfolder";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_ITEMS = "musiclibrary.exportitems";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_UNSCRAPED = "musiclibrary.exportunscraped";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE = "musiclibrary.exportoverwrite";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_ARTWORK = "musiclibrary.exportartwork";
+const std::string CSettings::SETTING_MUSICLIBRARY_EXPORT_SKIPNFO = "musiclibrary.exportskipnfo";
 const std::string CSettings::SETTING_MUSICLIBRARY_IMPORT = "musiclibrary.import";
 const std::string CSettings::SETTING_MUSICPLAYER_AUTOPLAYNEXTITEM = "musicplayer.autoplaynextitem";
 const std::string CSettings::SETTING_MUSICPLAYER_QUEUEBYDEFAULT = "musicplayer.queuebydefault";
@@ -532,7 +541,7 @@ bool CSettings::Initialize(const std::string &file)
   }
 
   CLog::Log(LOGDEBUG, "CSettings: loaded settings definition from %s", file.c_str());
-  
+
   return InitializeDefinitionsFromXml(xmlDoc);
 }
 
@@ -544,8 +553,15 @@ bool CSettings::InitializeDefinitions()
     return false;
   }
 #if defined(TARGET_WINDOWS)
+  if (CFile::Exists(SETTINGS_XML_FOLDER "windows.xml") && !Initialize(SETTINGS_XML_FOLDER "windows.xml"))
+    CLog::Log(LOGFATAL, "Unable to load windows-specific settings definitions");
+#if defined(TARGET_WINDOWS_DESKTOP)
   if (CFile::Exists(SETTINGS_XML_FOLDER "win32.xml") && !Initialize(SETTINGS_XML_FOLDER "win32.xml"))
     CLog::Log(LOGFATAL, "Unable to load win32-specific settings definitions");
+#elif defined(TARGET_WINDOWS_STORE)
+  if (CFile::Exists(SETTINGS_XML_FOLDER "win10.xml") && !Initialize(SETTINGS_XML_FOLDER "win10.xml"))
+    CLog::Log(LOGFATAL, "Unable to load win10-specific settings definitions");
+#endif
 #elif defined(TARGET_ANDROID)
   if (CFile::Exists(SETTINGS_XML_FOLDER "android.xml") && !Initialize(SETTINGS_XML_FOLDER "android.xml"))
     CLog::Log(LOGFATAL, "Unable to load android-specific settings definitions");
@@ -561,9 +577,6 @@ bool CSettings::InitializeDefinitions()
 #elif defined(TARGET_FREEBSD)
   if (CFile::Exists(SETTINGS_XML_FOLDER "freebsd.xml") && !Initialize(SETTINGS_XML_FOLDER "freebsd.xml"))
     CLog::Log(LOGFATAL, "Unable to load freebsd-specific settings definitions");
-#elif defined(HAS_IMXVPU)
-  if (CFile::Exists(SETTINGS_XML_FOLDER "imx6.xml") && !Initialize(SETTINGS_XML_FOLDER "imx6.xml"))
-    CLog::Log(LOGFATAL, "Unable to load imx6-specific settings definitions");
 #elif defined(TARGET_LINUX)
   if (CFile::Exists(SETTINGS_XML_FOLDER "linux.xml") && !Initialize(SETTINGS_XML_FOLDER "linux.xml"))
     CLog::Log(LOGFATAL, "Unable to load linux-specific settings definitions");
@@ -883,7 +896,7 @@ void CSettings::InitializeISettingCallbacks()
   settingSet.insert(CSettings::SETTING_VIDEOSCREEN_3DLUT);
   settingSet.insert(CSettings::SETTING_VIDEOSCREEN_DISPLAYPROFILE);
   GetSettingsManager()->RegisterCallback(&CDisplaySettings::GetInstance(), settingSet);
-  
+
   settingSet.clear();
   settingSet.insert(CSettings::SETTING_VIDEOPLAYER_SEEKDELAY);
   settingSet.insert(CSettings::SETTING_VIDEOPLAYER_SEEKSTEPS);
@@ -1087,7 +1100,7 @@ bool CSettings::Reset()
   // try to delete the settings file
   if (XFILE::CFile::Exists(settingsFile, false) && !XFILE::CFile::Delete(settingsFile))
     CLog::Log(LOGWARNING, "Unable to delete old settings file at %s", settingsFile.c_str());
-  
+
   // unload any loaded settings
   Unload();
 
